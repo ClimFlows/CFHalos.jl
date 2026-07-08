@@ -1,0 +1,3 @@
+[deps]
+CFHalos = "11f5c586-ae9d-41ff-95cf-58eeca9ad25f"
+Documenter = "e30172f5-a6a5-5a46-863b-614d45cd2de4"
