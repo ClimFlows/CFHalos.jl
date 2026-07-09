@@ -1,26 +1,20 @@
-using CFHalos
-using Test
-
 using NetCDF
 import InteractiveMPI: start
 import ClimFlowsData: VoronoiLowRes
 
-## halos
+using CFHalos: Halo, on_halos, halo_buffers, send_recv
+using Test
 
-struct Halo
-    other::Int # other rank involved in the exchange
-    indices::Vector{Int32} # indices to send/receive
-end
-
-function split_halos(raw, pos=0)
+# read halo info from DYNAMICO partitioned mesh file
+function split_halos(raw::AbstractVector{I}, pos=0) where {I<:Integer}
     function next()
         pos = pos+1
         return raw[pos]
     end
 
-    halos = Halo[]
+    halos = Halo{I}[]
     for _ in 1:next() # number of halos to receive
-        halo = Halo(next(), Int32[])
+        halo = Halo(Int(next()), I[])
         for j in 1:next()
             push!(halo.indices, next()) # indices in the file are already 1-based
         end
@@ -29,56 +23,6 @@ function split_halos(raw, pos=0)
     @assert pos == length(raw)
     return halos
 end
-
-function on_halos(fun, halos)
-    for halo in halos
-        foreach(fun, halo.indices)
-    end
-end
-
-function halo_buffers(data::AbstractVector, recv::Vector{Halo}, send::Vector{Halo})
-    buffers(halos) = [similar(data, size(halo.indices)) for halo in halos]
-    return buffers(recv), buffers(send)
-end
-
-function send_recv(MPI, comm, data_all, data_recv, data_send, recv, send)
-    @assert length(data_recv) == length(recv)
-    @assert length(data_send) == length(send)
-
-    rank = MPI.Comm_rank(comm)
-
-    # write into halos to be sent
-    for (n, data) in enumerate(data_send)
-        @assert length(data) == length(send[n].indices)
-        for (j, index) in enumerate(send[n].indices)
-            data[j] = data_all[index]
-        end
-    end
-
-    # exchange halos
-    send_reqs = [MPI.Isend(data, comm; dest=send[n].other, tag=rank) for (n, data) in enumerate(data_send)]
-    recv_reqs = [MPI.Irecv!(data, comm; source=recv[n].other, tag=recv[n].other) for (n, data) in enumerate(data_recv)]
-
-    # for req in send_reqs
-    #     @info "Sending" from=req.source to=req.dest  tag=req.tag len=length(req.msg)
-    # end
-    # for req in recv_reqs
-    #     @info "Receiving" from=req.source to=req.dest  tag=req.tag len=length(req.msg)
-    # end
-
-    # @info "Flush halo exchange" rank
-    MPI.Waitall(vcat(send_reqs, recv_reqs))
-
-    # read from received halos
-    for (n, data) in enumerate(data_recv)
-        @assert length(data) == length(recv[n].indices)
-        for (j, index) in enumerate(recv[n].indices)
-            data_all[index] = data[j]
-        end
-    end
-end
-
-## 
 
 pget(MPI, pmesh, var) = MPI.Critical() do
     slice(MPI.Comm_rank(MPI.COMM_WORLD), NetCDF.open(pmesh, var))
@@ -92,7 +36,6 @@ end
 
 slice(rank, array::AbstractVector) = array[rank+1]
 slice(rank, n, array::AbstractMatrix) = array[1:n, rank+1]
-# slice(rank, array::AbstractArray{T,3}) where T = array[:, :, rank+1]
 
 function main(MPI, pmesh)
     MPI.Init()
