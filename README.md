@@ -71,29 +71,27 @@ using CFHalos: Halo, on_halos, halo_buffers, send_recv, extract_halos
 using NetCDF
 using MPI
 
-# Helper functions to read from mesh files (these are typically defined in test files)
-pget(MPI, pmesh, var) = MPI.Critical() do
-    slice(MPI.Comm_rank(MPI.COMM_WORLD), NetCDF.open(pmesh, var))
+comm = MPI.COMM_WORLD
+rank = MPI.Comm_rank(comm)
+
+# Helper functions to read from mesh files
+function pget(pmesh, num, var)
+    n = slice(NetCDF.open(pmesh, num)) :: Int32
+    return slice(n, NetCDF.open(pmesh, var))
 end
 
-pget(MPI, pmesh, num, var) = MPI.Critical() do
-    rank = MPI.Comm_rank(MPI.COMM_WORLD)
-    n = slice(rank, NetCDF.open(pmesh, num)) :: Int32
-    return slice(rank, n, NetCDF.open(pmesh, var))
-end
-
-slice(rank, array::AbstractVector) = array[rank+1]
-slice(rank, n, array::AbstractMatrix) = array[1:n, rank+1]
+slice(array::AbstractVector) = array[rank+1]
+slice(n, array::AbstractMatrix) = array[1:n, rank+1]
 
 # Read halo data from mesh file using CFHalos.extract_halos
-primal_recv = extract_halos(pget(MPI, pmesh, "primal_recv_num", "primal_recv"))
-primal_send = extract_halos(pget(MPI, pmesh, "primal_send_num", "primal_send"))
+primal_recv = extract_halos(pget(pmesh, "primal_recv_num", "primal_recv"))
+primal_send = extract_halos(pget(pmesh, "primal_send_num", "primal_send"))
 ```
 
 3. Prepare buffers and perform halo exchanges:
 ```julia
 # Get data arrays from mesh
-Ai = pget(MPI, pmesh, "primal_num", "Ai")
+Ai = pget(pmesh, "primal_num", "Ai")
 
 # Preallocate buffers
 Ai_recv, Ai_send = halo_buffers(Ai, primal_recv, primal_send)
@@ -119,7 +117,7 @@ send_recv(MPI, comm, Ai2, Ai_recv, Ai_send, primal_recv, primal_send)
 - `on_halos`: Function to apply operations to all halo indices
 - `halo_buffers`: Function to create buffers for halo data exchange
 - `send_recv`: Function to perform actual MPI communication of halo data
-- `split_halos`: Function to parse halo information from DYNAMICO mesh files
+- `extract_halos`: Function to parse halo information from DYNAMICO mesh files
 
 ## Contributing
 
