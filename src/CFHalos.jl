@@ -50,4 +50,23 @@ function send_recv(MPI, comm, data_all, data_recv, data_send, recv, send)
     end
 end
 
+# extract halo information from DYNAMICO partitioned mesh file
+function extract_halos(raw::AbstractVector{I}, pos=0) where {I<:Integer}
+    function next()
+        pos = pos+1
+        return raw[pos]
+    end
+
+    halos = Halo{I}[]
+    for _ in 1:next() # number of halos to receive
+        halo = Halo(Int(next()), I[])
+        for j in 1:next()
+            push!(halo.indices, next()) # indices in the file are already 1-based
+        end
+        push!(halos, halo)
+    end
+    @assert pos == length(raw)
+    return halos
+end
+
 end

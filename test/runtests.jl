@@ -1,29 +1,11 @@
 using NetCDF
-import InteractiveMPI: start
+import InteractiveMPI: start, ThreadsMPIBackend
 import ClimFlowsData: VoronoiLowRes
 
-using CFHalos: Halo, on_halos, halo_buffers, send_recv
+using CFHalos: Halo, on_halos, halo_buffers, send_recv, extract_halos
 using Test
 
-# read halo info from DYNAMICO partitioned mesh file
-function split_halos(raw::AbstractVector{I}, pos=0) where {I<:Integer}
-    function next()
-        pos = pos+1
-        return raw[pos]
-    end
-
-    halos = Halo{I}[]
-    for _ in 1:next() # number of halos to receive
-        halo = Halo(Int(next()), I[])
-        for j in 1:next()
-            push!(halo.indices, next()) # indices in the file are already 1-based
-        end
-        push!(halos, halo)
-    end
-    @assert pos == length(raw)
-    return halos
-end
-
+# Helper functions to read from mesh files (needed for testing)
 pget(MPI, pmesh, var) = MPI.Critical() do
     slice(MPI.Comm_rank(MPI.COMM_WORLD), NetCDF.open(pmesh, var))
 end
@@ -41,8 +23,8 @@ function main(MPI, pmesh)
     MPI.Init()
     comm = MPI.COMM_WORLD
     rank = MPI.Comm_rank(comm)
-    primal_recv = split_halos(pget(MPI, pmesh, "primal_recv_num", "primal_recv"))
-    primal_send = split_halos(pget(MPI, pmesh, "primal_send_num", "primal_send"))
+    primal_recv = extract_halos(pget(MPI, pmesh, "primal_recv_num", "primal_recv"))
+    primal_send = extract_halos(pget(MPI, pmesh, "primal_send_num", "primal_send"))
     # @info "Rank" pmesh rank primal_recv primal_send
 
     Ai = pget(MPI, pmesh, "primal_num", "Ai")
@@ -66,8 +48,9 @@ function main(MPI, pmesh)
 end
 
 @testset "CFHalos.jl" begin
-    pmesh = VoronoiLowRes("mesh4deg.16.nc")
-    max_rank = length(NetCDF.open(pmesh,"primal_num"))
-    start(MPI->main(MPI, pmesh), max_rank)
+    nproc = 16
+    pmesh = VoronoiLowRes("mesh4deg.$nproc.nc")
+    backend = ThreadsMPIBackend(nproc)
+    start(MPI->main(MPI, pmesh), backend)
     @test true
 end
