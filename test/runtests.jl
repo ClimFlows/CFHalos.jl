@@ -1,5 +1,5 @@
 using NetCDF
-import InteractiveMPI: start
+import InteractiveMPI: start, ThreadsMPIBackend
 import ClimFlowsData: VoronoiLowRes
 
 using CFHalos: Halo, on_halos, halo_buffers, send_recv
@@ -66,8 +66,9 @@ function main(MPI, pmesh)
 end
 
 @testset "CFHalos.jl" begin
-    pmesh = VoronoiLowRes("mesh4deg.16.nc")
-    max_rank = length(NetCDF.open(pmesh,"primal_num"))
-    start(MPI->main(MPI, pmesh), max_rank)
+    nproc = 16
+    pmesh = VoronoiLowRes("mesh4deg.$nproc.nc")
+    backend = ThreadsMPIBackend(nproc)
+    start(MPI->main(MPI, pmesh), backend)
     @test true
 end
