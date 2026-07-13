@@ -1,6 +1,6 @@
 name = "CFHalos"
 uuid = "11f5c586-ae9d-41ff-95cf-58eeca9ad25f"
-version = "0.1.1"
+version = "0.1.2"
 authors = ["Thomas Dubos <thomas.dubos@polytechnique.edu> and contributors"]
 
 [compat]
