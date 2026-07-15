@@ -3,3 +3,6 @@ ClimFlowsData = "f57ce217-a21f-4063-8e40-561e9bf56723"
 InteractiveMPI = "babe802c-1c1b-4c4c-8440-d6d8c005748b"
 NetCDF = "30363a11-5582-574a-97bb-aa9a979735b9"
 Test = "8dfed614-e22c-5e08-85e1-65c5234f0b40"
+
+[compat]
+NetCDF = "0.12.2"
